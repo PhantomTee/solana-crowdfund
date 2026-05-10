@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
+import logo from "@/logo.png";
 import { WalletButton } from "@/components/wallet-button";
 import { CampaignCard } from "@/components/campaign-card";
 import { Button } from "@/components/ui/button";
@@ -29,14 +31,8 @@ export default function CampaignsPage() {
       <nav style={{ background: "var(--surface)", borderBottom: "2px solid var(--border)" }}
         className="sticky top-0 z-30">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-          <Link href="/campaigns" className="flex items-center gap-3 shrink-0">
-            <div className="h-8 w-8 flex items-center justify-center" style={{ background: "var(--primary)", border: "2px solid var(--text)" }}>
-              <svg viewBox="0 0 20 20" fill="none" className="w-4 h-4" aria-hidden="true">
-                <path d="M10 3 L17 7 L17 13 L10 17 L3 13 L3 7 Z" stroke="white" strokeWidth="1.8" strokeLinejoin="round"/>
-                <path d="M10 7 L10 13 M7 9 L13 11" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-            </div>
-            <span className="text-xl font-black tracking-tight" style={{ color: "var(--text)" }}>SolFund</span>
+          <Link href="/campaigns" className="flex items-center shrink-0">
+            <Image src={logo} alt="SolFund" height={44} className="w-auto" priority />
           </Link>
 
           <div className="flex items-center gap-2 ml-auto">

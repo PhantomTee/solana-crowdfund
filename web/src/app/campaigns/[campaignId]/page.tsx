@@ -2,6 +2,8 @@
 
 import { use, useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
+import logo from "@/logo.png";
 import { PublicKey } from "@solana/web3.js";
 import { WalletButton } from "@/components/wallet-button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -84,10 +86,13 @@ export default function CampaignDetailPage({ params }: PageProps) {
   return (
     <div className="min-h-screen" style={{ background: "var(--bg)" }}>
       {/* Navbar */}
-      <nav className="sticky top-0 z-30" style={{ background: "var(--surface)", borderBottom: "2px solid var(--border)" }}>
+      <nav className="sticky top-0 z-30 relative" style={{ background: "var(--surface)", borderBottom: "2px solid var(--border)" }}>
         <div className="max-w-3xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
           <Link href="/campaigns" className="inline-flex items-center gap-2 text-base font-bold hover:opacity-80 transition-opacity" style={{ color: "var(--text-muted)" }}>
             <ArrowLeft className="w-4 h-4" />All Campaigns
+          </Link>
+          <Link href="/campaigns" className="absolute left-1/2 -translate-x-1/2">
+            <Image src={logo} alt="SolFund" height={36} className="w-auto" />
           </Link>
           <div className="flex items-center gap-2">
             <ThemeToggle />
