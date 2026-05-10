@@ -31,9 +31,7 @@ export function MilestonePanel({
     !publicKey ||
     (publicKey.toBase58() !== creator.toBase58() &&
       publicKey.toBase58() !== beneficiary.toBase58())
-  ) {
-    return null;
-  }
+  ) return null;
 
   const goalMet = totalRaised.gte(goal);
   const allDone = milestonesReleased >= milestoneCount;
@@ -44,7 +42,7 @@ export function MilestonePanel({
       const tx = await releaseMilestone.mutateAsync();
       const pct = milestonePercentages[milestonesReleased];
       const amount = goal.muln(pct).divn(100);
-      toast.success(`Milestone released — ${formatUsdc(amount)} USDC sent`, {
+      toast.success(`Milestone released: ${formatUsdc(amount)} USDC sent`, {
         id: tid,
         description: `Tx: ${tx.slice(0, 16)}…`,
         action: { label: "Solscan ↗", onClick: () => window.open(`https://solscan.io/tx/${tx}?cluster=devnet`, "_blank") },
@@ -55,64 +53,53 @@ export function MilestonePanel({
   };
 
   return (
-    <div className="card p-6">
-      {/* Header */}
-      <div className="flex items-center gap-2 mb-5">
-        <div className="h-8 w-8 rounded-xl bg-[#fde8e4] flex items-center justify-center">
-          <Flag className="w-4 h-4 text-[#e05a42]" />
+    <div className="card p-6" style={{ borderColor: "rgba(224,90,66,0.4)" }}>
+      <div className="flex items-center gap-3 mb-5">
+        <div className="h-9 w-9 flex items-center justify-center" style={{ background: "var(--primary-light)", border: "1.5px solid rgba(224,90,66,0.3)" }}>
+          <Flag className="w-4 h-4" style={{ color: "var(--primary)" }} />
         </div>
-        <h3 className="font-bold text-[#1c1917] flex-1">Milestone Releases</h3>
-        <span className="text-xs text-stone-400 bg-stone-100 px-2.5 py-1 rounded-full">
-          {milestonesReleased}/{milestoneCount} done
+        <h3 className="text-lg font-black flex-1" style={{ color: "var(--text)" }}>Milestone Releases</h3>
+        <span className="text-sm font-bold px-2.5 py-1 border" style={{ background: "var(--surface-alt)", color: "var(--text-muted)", borderColor: "var(--border)" }}>
+          {milestonesReleased}/{milestoneCount}
         </span>
       </div>
 
-      {/* Milestone list */}
       <div className="space-y-2 mb-5">
         {milestonePercentages.slice(0, milestoneCount).map((pct, i) => {
           const amount = goal.muln(pct).divn(100);
           const released = i < milestonesReleased;
-          const current = i === milestonesReleased && goalMet;
+          const current  = i === milestonesReleased && goalMet;
+
+          const rowStyle: React.CSSProperties = released
+            ? { background: "rgba(22,163,74,0.07)", borderColor: "rgba(22,163,74,0.3)", color: "#16a34a" }
+            : current
+            ? { background: "var(--primary-light)", borderColor: "rgba(224,90,66,0.4)", color: "var(--text)" }
+            : { background: "var(--surface-alt)", borderColor: "var(--border)", color: "var(--text-muted)" };
 
           return (
-            <div
-              key={i}
-              className={`flex items-center justify-between rounded-xl px-4 py-3 text-sm border transition-all ${
-                released
-                  ? "border-green-200 bg-green-50 text-green-700"
-                  : current
-                  ? "border-[#e05a42]/30 bg-[#fde8e4] text-[#1c1917]"
-                  : "border-[#ede8e2] bg-stone-50 text-stone-400"
-              }`}
-            >
+            <div key={i} className="flex items-center justify-between px-4 py-3 text-base border" style={rowStyle}>
               <div className="flex items-center gap-2.5">
-                {released ? (
-                  <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
-                ) : current ? (
-                  <ChevronRight className="w-4 h-4 text-[#e05a42] shrink-0" />
-                ) : (
-                  <Circle className="w-4 h-4 shrink-0 opacity-30" />
-                )}
-                <span className="font-semibold">Milestone {i + 1}</span>
-                <span className={`text-xs px-1.5 py-0.5 rounded-md font-medium ${
-                  released ? "bg-green-100 text-green-600" :
-                  current ? "bg-[#e05a42]/15 text-[#e05a42]" :
-                  "bg-stone-200 text-stone-400"
-                }`}>
+                {released  ? <CheckCircle2 className="w-4 h-4 shrink-0" style={{ color: "#16a34a" }} />
+                : current  ? <ChevronRight className="w-4 h-4 shrink-0" style={{ color: "var(--primary)" }} />
+                           : <Circle       className="w-4 h-4 shrink-0 opacity-30" />}
+                <span className="font-bold">Milestone {i + 1}</span>
+                <span className="text-sm font-bold px-1.5 py-0.5 border" style={
+                  released ? { background: "rgba(22,163,74,0.12)", borderColor: "rgba(22,163,74,0.2)", color: "#16a34a" }
+                  : current ? { background: "rgba(224,90,66,0.1)", borderColor: "rgba(224,90,66,0.2)", color: "var(--primary)" }
+                  : { background: "var(--surface)", borderColor: "var(--border)", color: "var(--text-muted)" }
+                }>
                   {pct}%
                 </span>
               </div>
-              <span className="font-mono text-xs font-semibold">
-                {formatUsdc(amount)} USDC
-              </span>
+              <span className="font-mono font-bold text-sm">{formatUsdc(amount)} USDC</span>
             </div>
           );
         })}
       </div>
 
       {!goalMet && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-start gap-2 text-xs text-amber-700">
-          <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+        <div className="flex items-start gap-2 px-4 py-3 text-sm border" style={{ background: "rgba(202,138,4,0.08)", borderColor: "rgba(202,138,4,0.3)", color: "var(--warning)" }}>
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
           Goal must be fully funded before milestones can be released.
         </div>
       )}
@@ -120,16 +107,16 @@ export function MilestonePanel({
       {!allDone && goalMet && (
         <Button onClick={handleRelease} loading={releaseMilestone.isPending} className="w-full">
           Release Milestone {milestonesReleased + 1}
-          <span className="ml-1 opacity-75 font-normal">
+          <span className="ml-1 opacity-70 font-normal text-sm">
             ({milestonePercentages[milestonesReleased]}% = {formatUsdc(goal.muln(milestonePercentages[milestonesReleased]).divn(100))} USDC)
           </span>
         </Button>
       )}
 
       {allDone && (
-        <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700 font-semibold text-center flex items-center justify-center gap-2">
+        <div className="flex items-center justify-center gap-2 px-4 py-3 text-base font-bold border" style={{ background: "rgba(22,163,74,0.07)", borderColor: "rgba(22,163,74,0.3)", color: "#16a34a" }}>
           <CheckCircle2 className="w-4 h-4" />
-          All milestones have been released!
+          All milestones released!
         </div>
       )}
     </div>

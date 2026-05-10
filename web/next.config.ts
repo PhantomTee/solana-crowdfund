@@ -1,10 +1,9 @@
 import type { NextConfig } from "next";
-import webpack from "webpack";
+import path from "path";
 
 const nextConfig: NextConfig = {
-  // Silence the multiple-lockfiles warning
-  outputFileTracingRoot: "C:/Users/phant/Projects/solana-crowdfund/web",
-  webpack: (config, { isServer }) => {
+  outputFileTracingRoot: path.resolve(__dirname, ".."),
+  webpack: (config, { isServer, webpack }) => {
     // Polyfill Buffer and process — required by @solana/web3.js and Anchor
     if (!isServer) {
       config.resolve.fallback = {

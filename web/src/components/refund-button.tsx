@@ -41,24 +41,19 @@ export function RefundButton({ campaignPDA, goalMet, deadline }: RefundButtonPro
   };
 
   return (
-    <div className="card p-6 border-rose-200 bg-rose-50">
-      <div className="flex items-center gap-2 mb-3">
-        <div className="h-8 w-8 rounded-xl bg-rose-100 flex items-center justify-center">
+    <div className="card p-6" style={{ borderColor: "rgba(225,29,72,0.35)", background: "rgba(225,29,72,0.04)" }}>
+      <div className="flex items-center gap-3 mb-3">
+        <div className="h-9 w-9 flex items-center justify-center" style={{ background: "rgba(225,29,72,0.1)", border: "1.5px solid rgba(225,29,72,0.2)" }}>
           <ShieldOff className="w-4 h-4 text-rose-500" />
         </div>
-        <h3 className="font-bold text-rose-700">Claim Your Refund</h3>
+        <h3 className="text-lg font-black text-rose-600">Claim Your Refund</h3>
       </div>
-      <p className="text-sm text-rose-600/80 mb-5 leading-relaxed">
+      <p className="text-base mb-5" style={{ color: "var(--text-muted)" }}>
         This campaign expired without reaching its goal. You contributed{" "}
-        <span className="font-bold text-rose-700">{formatUsdc(refundAmount)} USDC</span>.
+        <span className="font-black" style={{ color: "var(--text)" }}>{formatUsdc(refundAmount)} USDC</span>.
         Claim your full refund trustlessly on-chain.
       </p>
-      <Button
-        variant="danger"
-        className="w-full"
-        onClick={handleRefund}
-        loading={claimRefund.isPending}
-      >
+      <Button variant="danger" className="w-full" onClick={handleRefund} loading={claimRefund.isPending}>
         <ArrowDownToLine className="w-4 h-4" />
         Claim {formatUsdc(refundAmount)} USDC
       </Button>

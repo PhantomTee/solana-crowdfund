@@ -3,7 +3,7 @@
 import Link from "next/link";
 import BN from "bn.js";
 import { formatUsdc, progressPct, formatDeadline, isDeadlinePassed } from "@/lib/utils";
-import { Clock, Users, Flag } from "lucide-react";
+import { Clock, Flag, Users } from "lucide-react";
 
 interface CampaignCardProps {
   publicKey: string;
@@ -23,16 +23,15 @@ export function CampaignCard({ publicKey, account }: CampaignCardProps) {
   const expired = isDeadlinePassed(account.deadline.toNumber());
   const goalMet = account.totalRaised.gte(account.goal);
 
-  const statusBg = goalMet
-    ? "bg-green-50 text-green-700 border-green-200"
+  const statusStyle: React.CSSProperties = goalMet
+    ? { background: "rgba(22,163,74,0.08)", color: "#16a34a", border: "1.5px solid rgba(22,163,74,0.3)" }
     : expired
-    ? "bg-stone-100 text-stone-500 border-stone-200"
-    : "bg-[#fde8e4] text-[#e05a42] border-[#f5c4bb]";
+    ? { background: "var(--surface-alt)", color: "var(--text-muted)", border: "1.5px solid var(--border)" }
+    : { background: "var(--primary-light)", color: "var(--primary)", border: "1.5px solid rgba(224,90,66,0.35)" };
 
-  const statusDot = goalMet ? "bg-green-500" : expired ? "bg-stone-400" : "bg-[#e05a42]";
+  const statusDot = goalMet ? "bg-green-500" : expired ? "bg-stone-400" : "bg-[var(--primary)]";
   const statusLabel = goalMet ? "Goal Met" : expired ? "Expired" : "Active";
-
-  const progressColor = goalMet ? "bg-green-500" : "bg-[#e05a42]";
+  const progressColor = goalMet ? "#16a34a" : "var(--primary)";
 
   return (
     <Link
@@ -41,41 +40,41 @@ export function CampaignCard({ publicKey, account }: CampaignCardProps) {
     >
       {/* Status + address */}
       <div className="flex items-start justify-between mb-4">
-        <p className="text-[11px] text-stone-400 font-mono">
+        <p className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
           {publicKey.slice(0, 4)}…{publicKey.slice(-4)}
         </p>
-        <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full border ${statusBg}`}>
+        <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1" style={statusStyle}>
           <span className={`h-1.5 w-1.5 rounded-full ${statusDot}`} />
           {statusLabel}
         </span>
       </div>
 
-      {/* Raised amount */}
+      {/* Amount */}
       <div className="mb-3">
-        <div className="flex items-baseline justify-between mb-1.5">
-          <span className="text-xl font-black text-[#1c1917]">
+        <div className="flex items-baseline justify-between mb-2">
+          <span className="text-2xl font-black" style={{ color: "var(--text)" }}>
             {formatUsdc(account.totalRaised)}
-            <span className="text-xs text-stone-400 font-normal ml-1">USDC</span>
+            <span className="text-sm font-normal ml-1" style={{ color: "var(--text-muted)" }}>USDC</span>
           </span>
-          <span className="text-xs text-stone-400">
+          <span className="text-sm" style={{ color: "var(--text-muted)" }}>
             / {formatUsdc(account.goal)}
           </span>
         </div>
 
         {/* Progress bar */}
-        <div className="h-2 rounded-full bg-stone-100 overflow-hidden">
+        <div className="h-2 overflow-hidden" style={{ background: "var(--surface-alt)", border: "1px solid var(--border)" }}>
           <div
-            className={`h-full rounded-full transition-all duration-700 ${progressColor}`}
-            style={{ width: `${pct}%` }}
+            className="h-full transition-all duration-700"
+            style={{ width: `${pct}%`, background: progressColor }}
           />
         </div>
-        <div className="flex justify-between mt-1.5 text-[11px] text-stone-400">
-          <span>{pct}% funded</span>
-        </div>
+        <p className="text-xs mt-1 text-right font-semibold" style={{ color: "var(--text-muted)" }}>
+          {pct}%
+        </p>
       </div>
 
       {/* Footer */}
-      <div className="pt-3 border-t border-[#ede8e2] flex items-center justify-between text-[11px] text-stone-400">
+      <div className="pt-3 flex items-center justify-between text-xs" style={{ borderTop: "1.5px solid var(--border)", color: "var(--text-muted)" }}>
         <span className="flex items-center gap-1">
           <Flag className="w-3 h-3" />
           {account.milestonesReleased}/{account.milestoneCount}

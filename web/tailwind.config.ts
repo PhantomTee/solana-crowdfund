@@ -9,11 +9,14 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ["var(--font-sans)", "Bricolage Grotesque", "sans-serif"],
+      },
       colors: {
         // Solana brand palette
         "sol-purple": "#9945FF",
-        "sol-green": "#14F195",
-        "sol-blue": "#00C2FF",
+        "sol-green":  "#14F195",
+        "sol-blue":   "#00C2FF",
       },
     },
   },

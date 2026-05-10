@@ -1,12 +1,14 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey, SystemProgram, SYSVAR_RENT_PUBKEY } from "@solana/web3.js";
 import {
   TOKEN_PROGRAM_ID,
   ASSOCIATED_TOKEN_PROGRAM_ID,
   getAssociatedTokenAddressSync,
+  createAssociatedTokenAccountInstruction,
+  getAccount,
 } from "@solana/spl-token";
 import BN from "bn.js";
 import { useCrowdfundProgram } from "./use-crowdfund-program";
@@ -161,6 +163,7 @@ export function useContribute(campaignPDA: PublicKey) {
 /** Release the next milestone (creator/beneficiary only) */
 export function useReleaseMilestone(campaignPDA: PublicKey, beneficiary: PublicKey) {
   const { program, deriveVaultPDA } = useCrowdfundProgram();
+  const { connection } = useConnection();
   const { publicKey } = useWallet();
   const qc = useQueryClient();
 
@@ -169,10 +172,23 @@ export function useReleaseMilestone(campaignPDA: PublicKey, beneficiary: PublicK
       if (!program || !publicKey) throw new Error("Wallet not connected");
 
       const [vaultPDA] = deriveVaultPDA(campaignPDA);
-      const beneficiaryUsdcAta = getAssociatedTokenAddressSync(
-        USDC_MINT,
-        beneficiary
-      );
+      const beneficiaryUsdcAta = getAssociatedTokenAddressSync(USDC_MINT, beneficiary);
+
+      // If the beneficiary has never received USDC their ATA won't exist yet.
+      // Prepend a create-ATA instruction so the milestone release never fails.
+      const preInstructions = [];
+      try {
+        await getAccount(connection, beneficiaryUsdcAta);
+      } catch {
+        preInstructions.push(
+          createAssociatedTokenAccountInstruction(
+            publicKey,          // payer
+            beneficiaryUsdcAta,
+            beneficiary,
+            USDC_MINT
+          )
+        );
+      }
 
       return program.methods
         .releaseMilestone()
@@ -184,6 +200,7 @@ export function useReleaseMilestone(campaignPDA: PublicKey, beneficiary: PublicK
           tokenProgram: TOKEN_PROGRAM_ID,
           associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
         } as never)
+        .preInstructions(preInstructions)
         .rpc();
     },
     onSuccess: () =>

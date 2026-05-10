@@ -11,26 +11,24 @@ export function WalletButton() {
   const { setVisible } = useWalletModal();
 
   if (connecting) {
-    return (
-      <Button size="sm" loading>
-        Connecting
-      </Button>
-    );
+    return <Button size="sm" loading>Connecting</Button>;
   }
 
   if (publicKey) {
     return (
       <div className="flex items-center gap-2">
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-stone-100 border border-[#ede8e2]">
-          <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
-          <span className="text-xs text-stone-600 font-mono">
-            {shortAddress(publicKey.toBase58())}
-          </span>
+        <div
+          className="flex items-center gap-2 px-3 py-1.5 border text-sm font-mono"
+          style={{ background: "var(--surface-alt)", border: "1.5px solid var(--border)", color: "var(--text-muted)" }}
+        >
+          <div className="h-2 w-2 rounded-full bg-green-500" />
+          {shortAddress(publicKey.toBase58())}
         </div>
         <button
           onClick={disconnect}
-          className="p-1.5 rounded-xl text-stone-400 hover:text-rose-500 hover:bg-rose-50 transition-all duration-150"
           title="Disconnect"
+          className="h-8 w-8 flex items-center justify-center border transition-all hover:border-rose-400 hover:text-rose-500"
+          style={{ border: "1.5px solid var(--border)", background: "var(--surface)", color: "var(--text-muted)" }}
         >
           <LogOut className="w-3.5 h-3.5" />
         </button>
@@ -40,7 +38,7 @@ export function WalletButton() {
 
   return (
     <Button size="sm" onClick={() => setVisible(true)}>
-      <Wallet className="w-3.5 h-3.5" />
+      <Wallet className="w-4 h-4" />
       Connect Wallet
     </Button>
   );
