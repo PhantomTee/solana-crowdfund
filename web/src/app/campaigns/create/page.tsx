@@ -13,8 +13,8 @@ import { VoicePitchPlayer } from "@/components/voice-pitch-player";
 import { useCreateCampaign } from "@/hooks/use-campaigns";
 import { ArrowLeft, Plus, Trash2, AlertCircle, Mic, Loader2 } from "lucide-react";
 
-/** Saves campaign metadata (title, description, voicePitch) to localStorage */
-function saveMeta(pda: string, data: { title: string; description: string; voicePitch?: string }) {
+/** Saves campaign metadata to localStorage */
+function saveMeta(pda: string, data: { title: string; description: string; voicePitch?: string; voicePitchText?: string }) {
   try { localStorage.setItem(`solfund-meta-${pda}`, JSON.stringify(data)); }
   catch { /* storage full — silent */ }
 }
@@ -31,7 +31,8 @@ export default function CreateCampaignPage() {
   const [title,         setTitle]         = useState("");
   const [description,   setDescription]   = useState("");
 
-  const [pitchAudio,    setPitchAudio]    = useState<string | null>(null); // data URL
+  const [pitchAudio,    setPitchAudio]    = useState<string | null>(null); // data URL (ElevenLabs)
+  const [pitchText,     setPitchText]     = useState<string | null>(null); // fallback: browser synthesis
   const [pitchLoading,  setPitchLoading]  = useState(false);
 
   const milestoneSum = milestones.reduce((a, b) => a + b, 0);
@@ -67,11 +68,22 @@ export default function CreateCampaignPage() {
 
       const dataUrl = `data:${data.mimeType};base64,${data.audioBase64}`;
       setPitchAudio(dataUrl);
+      setPitchText(null);
       toast.success("Voice pitch generated!");
-    } catch (err: unknown) {
-      toast.error("Voice generation failed", {
-        description: err instanceof Error ? err.message : String(err),
-      });
+    } catch {
+      // ElevenLabs unavailable — fall back to browser speech synthesis
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        const fallback = [
+          title ? `Welcome to ${title}.` : "",
+          description || `We are raising ${goal} USDC${milestones.length > 1 ? ` across ${milestones.length} milestones` : ""}.`,
+          "Your support makes a real difference. Please contribute today.",
+        ].filter(Boolean).join(" ");
+        setPitchText(fallback);
+        setPitchAudio(null);
+        toast.info("Using browser voice", { description: "ElevenLabs quota reached — your pitch will use browser TTS." });
+      } else {
+        toast.error("Voice generation unavailable");
+      }
     } finally {
       setPitchLoading(false);
     }
@@ -105,6 +117,7 @@ export default function CreateCampaignPage() {
         title:       title.trim(),
         description: description.trim(),
         ...(pitchAudio ? { voicePitch: pitchAudio } : {}),
+        ...(pitchText && !pitchAudio ? { voicePitchText: pitchText } : {}),
       });
 
       toast.success("Campaign created!", {
@@ -292,9 +305,13 @@ export default function CreateCampaignPage() {
                 : <><Mic className="w-4 h-4" />{pitchAudio ? "Regenerate Voice Pitch" : "Generate Voice Pitch"}</>}
             </button>
 
-            {pitchAudio && (
+            {(pitchAudio || pitchText) && (
               <div className="mt-4">
-                <VoicePitchPlayer src={pitchAudio} label="Preview your voice pitch" />
+                <VoicePitchPlayer
+                  src={pitchAudio ?? undefined}
+                  text={pitchText ?? undefined}
+                  label="Preview your voice pitch"
+                />
                 <p className="text-sm mt-2 text-center" style={{ color: "var(--text-muted)" }}>
                   ✓ This pitch will be saved and shown on your campaign page
                 </p>

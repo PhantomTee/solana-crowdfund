@@ -25,7 +25,7 @@ export default function CampaignDetailPage({ params }: PageProps) {
   const { campaignId } = use(params);
   const { data: campaign, isLoading, error } = useCampaign(campaignId);
 
-  const [meta, setMeta] = useState<{ title?: string; description?: string; voicePitch?: string } | null>(null);
+  const [meta, setMeta] = useState<{ title?: string; description?: string; voicePitch?: string; voicePitchText?: string } | null>(null);
   useEffect(() => {
     try {
       const raw = localStorage.getItem(`solfund-meta-${campaignId}`);
@@ -160,9 +160,13 @@ export default function CampaignDetailPage({ params }: PageProps) {
           <p className="text-base leading-relaxed -mt-2" style={{ color: "var(--text-muted)" }}>{meta.description}</p>
         )}
 
-        {/* Voice pitch player */}
-        {meta?.voicePitch && (
-          <VoicePitchPlayer src={meta.voicePitch} label="🎙️ Hear from the creator" />
+        {/* Voice pitch player — ElevenLabs audio or browser TTS fallback */}
+        {(meta?.voicePitch || meta?.voicePitchText) && (
+          <VoicePitchPlayer
+            src={meta.voicePitch}
+            text={meta.voicePitchText}
+            label="🎙️ Hear from the creator"
+          />
         )}
 
         {/* Metadata */}
