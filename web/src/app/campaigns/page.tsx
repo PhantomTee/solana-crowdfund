@@ -11,19 +11,61 @@ import { HeroIllustration } from "@/components/illustrations/HeroIllustration";
 import { EmptyIllustration } from "@/components/illustrations/EmptyIllustration";
 import { useCampaigns } from "@/hooks/use-campaigns";
 import { CIRCLE_FAUCET_URL, SOLANA_FAUCET_URL } from "@/lib/constants";
-import { ExternalLink, Plus, RefreshCw } from "lucide-react";
+import { ExternalLink, Plus, RefreshCw, SlidersHorizontal } from "lucide-react";
+import { useState, useMemo } from "react";
+
+type Filter = "all" | "active" | "funded" | "expired";
+type Sort   = "newest" | "ending-soon" | "most-funded" | "least-funded";
 
 export default function CampaignsPage() {
   const { data: campaigns, isLoading, error, refetch, isRefetching } = useCampaigns();
 
+  const [filter, setFilter] = useState<Filter>("all");
+  const [sort,   setSort]   = useState<Sort>("newest");
+
   const total  = campaigns?.length ?? 0;
+  const nowSec = Date.now() / 1000;
+
   const active = campaigns?.filter((c: { account: { totalRaised: { gte: (g: unknown) => boolean }; goal: unknown; deadline: { toNumber(): number } } }) => {
     const a = c.account;
-    return !a.totalRaised.gte(a.goal) && a.deadline.toNumber() > Date.now() / 1000;
+    return !a.totalRaised.gte(a.goal) && a.deadline.toNumber() > nowSec;
   }).length ?? 0;
   const funded = campaigns?.filter((c: { account: { totalRaised: { gte: (g: unknown) => boolean }; goal: unknown } }) =>
     c.account.totalRaised.gte(c.account.goal)
   ).length ?? 0;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const displayed = useMemo<any[]>(() => {
+    if (!campaigns) return [];
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let list: any[] = [...campaigns];
+
+    // ── Filter ──────────────────────────────────────────────────
+    if (filter === "active") {
+      list = list.filter(({ account: a }) =>
+        !a.totalRaised.gte(a.goal) && a.deadline.toNumber() > nowSec
+      );
+    } else if (filter === "funded") {
+      list = list.filter(({ account: a }) => a.totalRaised.gte(a.goal));
+    } else if (filter === "expired") {
+      list = list.filter(({ account: a }) =>
+        a.deadline.toNumber() <= nowSec && !a.totalRaised.gte(a.goal)
+      );
+    }
+
+    // ── Sort ─────────────────────────────────────────────────────
+    list.sort((x, y) => {
+      const a = x.account, b = y.account;
+      if (sort === "newest")       return b.campaignId.toNumber() - a.campaignId.toNumber();
+      if (sort === "ending-soon")  return a.deadline.toNumber()   - b.deadline.toNumber();
+      if (sort === "most-funded")  return b.totalRaised.toNumber() - a.totalRaised.toNumber();
+      if (sort === "least-funded") return a.totalRaised.toNumber() - b.totalRaised.toNumber();
+      return 0;
+    });
+
+    return list;
+  }, [campaigns, filter, sort, nowSec]);
 
   return (
     <div className="min-h-screen" style={{ background: "var(--bg)" }}>
@@ -108,15 +150,55 @@ export default function CampaignsPage() {
           </div>
         )}
 
-        {/* ── Toolbar ── */}
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-black" style={{ color: "var(--text)" }}>
-            All Campaigns
-            {campaigns && <span className="ml-2 text-base font-normal" style={{ color: "var(--text-muted)" }}>({campaigns.length})</span>}
-          </h2>
-          <Button variant="ghost" size="sm" onClick={() => refetch()} loading={isRefetching}>
-            <RefreshCw className="w-4 h-4" />Refresh
-          </Button>
+        {/* ── Filter + Sort toolbar ── */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
+
+          {/* Filter pills */}
+          <div className="flex items-center gap-1 p-1 flex-wrap" style={{ background: "var(--surface)", border: "1.5px solid var(--border)" }}>
+            <SlidersHorizontal className="w-3.5 h-3.5 ml-1 shrink-0" style={{ color: "var(--text-muted)" }} />
+            {(["all", "active", "funded", "expired"] as Filter[]).map((f) => {
+              const labels: Record<Filter, string> = { all: `All (${total})`, active: `Active (${active})`, funded: `Funded (${funded})`, expired: "Expired" };
+              const active_ = filter === f;
+              return (
+                <button
+                  key={f}
+                  onClick={() => setFilter(f)}
+                  className="px-3 py-1.5 text-sm font-bold transition-all"
+                  style={{
+                    background:  active_ ? "var(--primary)" : "transparent",
+                    color:       active_ ? "white" : "var(--text-muted)",
+                    border:      active_ ? "1.5px solid var(--text)" : "1.5px solid transparent",
+                    boxShadow:   active_ ? "2px 2px 0 var(--text)" : "none",
+                  }}
+                >
+                  {labels[f]}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Sort + refresh */}
+          <div className="flex items-center gap-2 sm:ml-auto">
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value as Sort)}
+              className="text-sm font-bold py-1.5 px-3 h-9 appearance-none cursor-pointer"
+              style={{
+                background:  "var(--surface)",
+                border:      "1.5px solid var(--border)",
+                color:       "var(--text)",
+                outline:     "none",
+              }}
+            >
+              <option value="newest">Newest first</option>
+              <option value="ending-soon">Ending soon</option>
+              <option value="most-funded">Most funded</option>
+              <option value="least-funded">Least funded</option>
+            </select>
+            <Button variant="ghost" size="sm" onClick={() => refetch()} loading={isRefetching}>
+              <RefreshCw className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
 
         {/* ── Grid ── */}
@@ -139,9 +221,16 @@ export default function CampaignsPage() {
               <p className="text-base mb-6" style={{ color: "var(--text-muted)" }}>Be the first to launch one.</p>
               <Link href="/campaigns/create"><Button><Plus className="w-4 h-4" />Create Campaign</Button></Link>
             </div>
+          ) : displayed.length === 0 ? (
+            <div className="card text-center py-14">
+              <p className="text-lg font-black mb-1" style={{ color: "var(--text)" }}>No campaigns match this filter</p>
+              <button onClick={() => setFilter("all")} className="text-base font-bold hover:underline mt-1" style={{ color: "var(--primary)" }}>
+                Show all campaigns
+              </button>
+            </div>
           ) : (
             <div className="stagger grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {campaigns.map((c: { publicKey: { toBase58(): string }; account: Parameters<typeof CampaignCard>[0]["account"] }) => (
+              {displayed.map((c: { publicKey: { toBase58(): string }; account: Parameters<typeof CampaignCard>[0]["account"] }) => (
                 <CampaignCard key={c.publicKey.toBase58()} publicKey={c.publicKey.toBase58()} account={c.account} />
               ))}
             </div>
