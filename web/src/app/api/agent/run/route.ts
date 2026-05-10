@@ -6,6 +6,7 @@ import {
   Transaction,
   VersionedTransaction,
 } from "@solana/web3.js";
+import { ChatAgent } from "@virtuals-protocol/game";
 import {
   TOKEN_PROGRAM_ID,
   ASSOCIATED_TOKEN_PROGRAM_ID,
@@ -27,7 +28,7 @@ import { paymentStore } from "@/lib/payment-store";
 import IDL_JSON from "@/lib/crowdfund-idl.json";
 
 const AGENT_SECRET      = process.env.AGENT_SOLANA_SECRET_KEY ?? "";
-const TERMINAL_KEY      = process.env.VIRTUALS_API_KEY ?? "";
+const VIRTUALS_KEY      = process.env.VIRTUALS_API_KEY ?? "";
 const OPENROUTER_KEY    = process.env.OPENROUTER_API_KEY ?? "";
 const HEURIST_KEY       = process.env.HEURIST_API_KEY ?? "";
 const DONATION_USDC     = 1_000_000; // 1 USDC in micro-USDC
@@ -35,13 +36,13 @@ const COOLDOWN_MS       = 60_000;    // 60 s
 
 // ── Virtuals Terminal API ─────────────────────────────────────────────────────
 
-/** Exchange the Terminal API key for a short-lived access token */
+/** Exchange the Virtuals API key for a short-lived Terminal access token */
 async function getTerminalToken(): Promise<string | null> {
-  if (!TERMINAL_KEY) return null;
+  if (!VIRTUALS_KEY) return null;
   try {
     const res = await fetch("https://api.virtuals.io/api/accesses/tokens", {
       method: "POST",
-      headers: { "X-API-KEY": TERMINAL_KEY },
+      headers: { "X-API-KEY": VIRTUALS_KEY },
       signal: AbortSignal.timeout(8_000),
     });
     if (!res.ok) return null;
@@ -82,14 +83,63 @@ async function terminalLog(
   }
 }
 
-// ── LLM reasoning (OpenRouter or Heurist) ────────────────────────────────────
+// ── Virtuals ChatAgent reasoning ──────────────────────────────────────────────
 
-interface LLMConfig {
-  baseUrl: string;
-  apiKey:  string;
-  model:   string;
-  label:   string;
+/**
+ * Ask the Virtuals ChatAgent (apt- key) to pick the best campaign.
+ * Uses createChat() + chat.next() — the real V2 API flow.
+ */
+async function callVirtuals(summaries: Omit<CampaignSummary, "score">[]): Promise<{ index: number; reasoning: string } | null> {
+  if (!VIRTUALS_KEY) return null;
+  try {
+    const agent = new ChatAgent(
+      VIRTUALS_KEY,
+      `You are a Solana crowdfunding donation agent. You analyse active campaigns and
+decide which single one most deserves a 1 USDC donation. You weigh three factors:
+funding momentum (how close to goal), deadline urgency (days remaining), and
+accountability (milestone count — more tranches means more transparent fund release).
+Always respond with valid JSON only — no markdown, no explanation outside the JSON.`
+    );
+
+    const chat = await agent.createChat({
+      partnerId:   "solfund-agent",
+      partnerName: "SolFund",
+    });
+
+    const prompt = `Active campaigns on Solana Devnet:
+${summaries.map((c, i) =>
+  `${i + 1}. ${c.progressPct}% funded | ${c.daysLeft} days left | ${c.milestones} milestone tranches | goal: ${c.goalUsdc} USDC`
+).join("\n")}
+
+Pick the ONE campaign that most deserves the 1 USDC donation.
+
+Respond with ONLY valid JSON:
+{"campaignIndex": <0-based integer>, "reasoning": "<1-2 short sentences>"}`;
+
+    const response = await chat.next(prompt);
+    const content  = response?.message ?? "";
+
+    chat.end();
+
+    const match = content.match(/\{[\s\S]*?"campaignIndex"[\s\S]*?\}/);
+    if (!match) return null;
+
+    const parsed = JSON.parse(match[0]) as { campaignIndex?: unknown; reasoning?: unknown };
+    const idx    = Number(parsed.campaignIndex);
+    if (!Number.isFinite(idx) || idx < 0 || idx >= summaries.length) return null;
+
+    return {
+      index:     idx,
+      reasoning: typeof parsed.reasoning === "string" ? parsed.reasoning.trim() : "",
+    };
+  } catch {
+    return null;
+  }
 }
+
+// ── Heurist / OpenRouter fallback ─────────────────────────────────────────────
+
+interface LLMConfig { baseUrl: string; apiKey: string; model: string; label: string; }
 
 function getLLMConfig(): LLMConfig | null {
   if (OPENROUTER_KEY) return {
@@ -107,7 +157,7 @@ function getLLMConfig(): LLMConfig | null {
   return null;
 }
 
-async function callLLM(summaries: Omit<CampaignSummary, "score">[]): Promise<{ index: number; reasoning: string } | null> {
+async function callLLMFallback(summaries: Omit<CampaignSummary, "score">[]): Promise<{ index: number; reasoning: string } | null> {
   const cfg = getLLMConfig();
   if (!cfg) return null;
 
@@ -130,9 +180,9 @@ Respond with ONLY valid JSON, no markdown, no trailing text:
         ...(OPENROUTER_KEY ? { "HTTP-Referer": "https://solfund.app", "X-Title": "SolFund Agent" } : {}),
       },
       body: JSON.stringify({
-        model:      cfg.model,
-        messages:   [{ role: "user", content: prompt }],
-        max_tokens: 400,
+        model:       cfg.model,
+        messages:    [{ role: "user", content: prompt }],
+        max_tokens:  400,
         temperature: 0.4,
       }),
       signal: AbortSignal.timeout(20_000),
@@ -140,9 +190,9 @@ Respond with ONLY valid JSON, no markdown, no trailing text:
 
     if (!res.ok) return null;
 
-    const data   = await res.json();
+    const data    = await res.json();
     const content: string = data?.choices?.[0]?.message?.content ?? "";
-    const match  = content.match(/\{[\s\S]*?"campaignIndex"[\s\S]*?\}/);
+    const match   = content.match(/\{[\s\S]*?"campaignIndex"[\s\S]*?\}/);
     if (!match) return null;
 
     const parsed = JSON.parse(match[0]) as { campaignIndex?: unknown; reasoning?: unknown };
@@ -333,18 +383,26 @@ export async function POST() {
     .map((c) => `- Campaign ${c.index + 1}: ${c.progressPct}% funded, ${c.daysLeft}d left, ${c.milestones} milestones, score ${c.score.toFixed(3)}`)
     .join("\n");
 
-  const llmCfg = getLLMConfig();
+  const llmCfg    = getLLMConfig();
+  const reasoner  = VIRTUALS_KEY ? "Virtuals GAME Agent" : llmCfg ? llmCfg.label : "heuristic";
   await terminalLog(termToken, "planner_module", `Analysing ${summaries.length} Active Campaign${summaries.length === 1 ? "" : "s"}`,
-    `Scoring by: 50% funding momentum, 30% deadline urgency, 20% milestone accountability\n\n${analysisTable}\n\n${llmCfg ? `LLM: ${llmCfg.label}` : "LLM: not configured (heuristic mode)"}`
+    `Scoring by: 50% funding momentum, 30% deadline urgency, 20% milestone accountability\n\n${analysisTable}\n\nReasoning engine: ${reasoner}`
   );
 
-  // Try LLM reasoning first; fall back to heuristic score if unavailable
-  const llmResult = await callLLM(summaries);
+  // Priority: Virtuals ChatAgent → Heurist/OpenRouter → heuristic score
+  const virtualsResult = await callVirtuals(summaries);
+  const llmResult      = virtualsResult ?? await callLLMFallback(summaries);
 
   let chosen: CampaignSummary;
   let reasoning: string;
 
-  if (llmResult) {
+  if (virtualsResult) {
+    chosen    = summaries[virtualsResult.index];
+    reasoning = virtualsResult.reasoning || buildReasoning(chosen, summaries);
+    await terminalLog(termToken, "planner_module", "Virtuals GAME Decision",
+      `Selected Campaign ${chosen.index + 1}\n\n${reasoning}`
+    );
+  } else if (llmResult) {
     chosen    = summaries[llmResult.index];
     reasoning = llmResult.reasoning || buildReasoning(chosen, summaries);
     await terminalLog(termToken, "planner_module", `AI Decision (${llmCfg?.label ?? "LLM"})`,
@@ -354,7 +412,7 @@ export async function POST() {
     chosen    = summaries.reduce((best, c) => c.score > best.score ? c : best, summaries[0]);
     reasoning = buildReasoning(chosen, summaries);
     await terminalLog(termToken, "planner_module", "Heuristic Decision",
-      `LLM unavailable. Selected Campaign ${chosen.index + 1} by weighted score.\n\n${reasoning}`
+      `No AI available. Selected Campaign ${chosen.index + 1} by weighted score.\n\n${reasoning}`
     );
   }
 
