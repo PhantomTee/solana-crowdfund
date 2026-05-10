@@ -127,6 +127,7 @@ export function useCreateCampaign() {
 /** Contribute USDC to a campaign */
 export function useContribute(campaignPDA: PublicKey) {
   const { program, deriveVaultPDA, deriveDonorStatePDA } = useCrowdfundProgram();
+  const { connection } = useConnection();
   const { publicKey } = useWallet();
   const qc = useQueryClient();
 
@@ -138,6 +139,22 @@ export function useContribute(campaignPDA: PublicKey) {
       const [vaultPDA] = deriveVaultPDA(campaignPDA);
       const [donorStatePDA] = deriveDonorStatePDA(campaignPDA, publicKey);
       const donorUsdcAta = getAssociatedTokenAddressSync(USDC_MINT, publicKey);
+
+      // If the donor has never held USDC their ATA won't exist yet.
+      // Prepend a create-ATA instruction so contribute never hits AccountNotInitialized.
+      const preInstructions = [];
+      try {
+        await getAccount(connection, donorUsdcAta);
+      } catch {
+        preInstructions.push(
+          createAssociatedTokenAccountInstruction(
+            publicKey,      // payer
+            donorUsdcAta,
+            publicKey,      // owner
+            USDC_MINT
+          )
+        );
+      }
 
       return program.methods
         .contribute(amount)
@@ -151,6 +168,7 @@ export function useContribute(campaignPDA: PublicKey) {
           associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
           systemProgram: SystemProgram.programId,
         } as never)
+        .preInstructions(preInstructions)
         .rpc();
     },
     onSuccess: () => {
